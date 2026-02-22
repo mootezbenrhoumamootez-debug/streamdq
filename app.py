@@ -18,7 +18,7 @@ st.markdown("""
   .bundle-label { font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin-bottom: 0.5rem; }
   .stButton > button { background-color: #0f0f0f !important; color: white !important; border: none !important; padding: 0.75rem 2rem !important; font-size: 1rem !important; font-weight: 600 !important; width: 100% !important; border-radius: 4px !important; }
   .stButton > button:hover { background-color: #3d4a5c !important; }
-  .agent-box { background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 4px; padding: 1rem 1.2rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.7; }
+  .agent-box { background: #FFFFFF; border-left: 4px solid #3b82f6; border-radius: 4px; padding: 1rem 1.2rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.7; }
 </style>
 """, unsafe_allow_html=True)
 
