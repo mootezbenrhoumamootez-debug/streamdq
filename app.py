@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import anthropic
 import sys
 import os
 
@@ -47,6 +48,15 @@ st.markdown("""
     border-radius: 4px !important;
   }
   .stButton > button:hover { background-color: #3d4a5c !important; }
+  .agent-box {
+    background: #f0ede6;
+    border-left: 4px solid #c9a84c;
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,12 +68,67 @@ BUNDLE_NAMES = {
     8: "Renter Basic",          9: "Renter Premium",
 }
 
+BUNDLE_DESCRIPTIONS = {
+    0: "Covers damage to the customer's own vehicle from accidents, theft, weather, and other incidents.",
+    1: "Covers damage the customer causes to others' vehicles or property — basic legal minimum.",
+    2: "Essential health coverage for individuals: doctor visits, hospital stays, and emergencies.",
+    3: "Comprehensive health and life coverage designed for households with multiple dependents.",
+    4: "Health plan bundled with dental and vision — ideal for employed families.",
+    5: "Premium homeowners policy covering structure, contents, liability, and natural disasters.",
+    6: "Standard homeowners coverage for structure and contents at an affordable price point.",
+    7: "Top-tier health insurance combined with life insurance for maximum protection.",
+    8: "Basic renters insurance covering personal belongings and liability for tenants.",
+    9: "Enhanced renters insurance with higher coverage limits and additional protections.",
+}
+
 # ── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_model():
     return load_model()
 
 model = get_model()
+
+
+# ── AI Explanation ────────────────────────────────────────────────────────────
+def explain_prediction(bundle_id, bundle_name, profile: dict):
+    """Call Claude to explain why this bundle was recommended."""
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return "⚠️ Set your `ANTHROPIC_API_KEY` in Streamlit secrets to enable AI explanations."
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    profile_summary = "\n".join([
+        f"- Annual Income: ${profile['income']:,.0f}",
+        f"- Employment: {profile['employment'] or 'Not specified'}",
+        f"- Adult Dependents: {profile['adult_dep']}, Children: {profile['child_dep']}, Infants: {profile['infant_dep']}",
+        f"- Vehicles on Policy: {profile['vehicles']}",
+        f"- Existing Policyholder: {profile['existing']}",
+        f"- Previous Claims: {profile['claims_filed']}",
+        f"- Years Without Claims: {profile['years_no_claim']}",
+        f"- Deductible Tier: {profile['deductible'] or 'Not specified'}",
+        f"- Payment Schedule: {profile['payment'] or 'Not specified'}",
+        f"- Acquisition Channel: {profile['channel'] or 'Not specified'}",
+    ])
+
+    prompt = f"""You are an expert insurance advisor. A machine learning model has recommended the following bundle for a customer:
+
+Bundle ID: {bundle_id}
+Bundle Name: {bundle_name}
+Bundle Description: {BUNDLE_DESCRIPTIONS[bundle_id]}
+
+Customer Profile:
+{profile_summary}
+
+In 3-4 sentences, explain to the customer in plain, friendly language WHY this bundle is a good fit for their profile. Be specific — reference their actual profile details. Do not mention the ML model. Sound like a knowledgeable human advisor."""
+
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return message.content[0].text
+
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("🛡️ InsureIQ — Bundle Recommender")
@@ -160,7 +225,19 @@ with col_result:
         </div>
         """, unsafe_allow_html=True)
 
-        st.success(f"Bundle ID **{bundle_id}** · {bundle_name}")
+        # ── AI Explanation ─────────────────────────────────────────────────
+        st.markdown("**🤖 Why this bundle?**")
+        with st.spinner("Generating explanation..."):
+            profile = dict(
+                income=income, employment=employment, adult_dep=adult_dep,
+                child_dep=child_dep, infant_dep=infant_dep, vehicles=vehicles,
+                existing=existing, claims_filed=claims_filed,
+                years_no_claim=years_no_claim, deductible=deductible,
+                payment=payment, channel=channel,
+            )
+            explanation = explain_prediction(bundle_id, bundle_name, profile)
+
+        st.markdown(f'<div class="agent-box">{explanation}</div>', unsafe_allow_html=True)
 
     else:
         st.info("Fill in the form and click **Get Recommendation**.")
