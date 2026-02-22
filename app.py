@@ -1,71 +1,31 @@
 import streamlit as st
 import pandas as pd
-import anthropic
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 from solution import preprocess, load_model, predict
 
-# ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="InsureIQ — Bundle Recommender",
-    page_icon="🛡️",
-    layout="wide"
-)
+st.set_page_config(page_title="InsureIQ — Bundle Recommender", page_icon="🛡️", layout="wide")
 
-# ── Styling ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
   .main { background-color: #f5f2ec; }
   .block-container { padding-top: 2rem; }
-  .bundle-card {
-    background: #0f0f0f; color: #f5f2ec;
-    border-radius: 8px; padding: 2rem;
-    text-align: center; margin-top: 1rem;
-  }
-  .bundle-number {
-    font-size: 4rem; font-weight: 900;
-    color: #c9a84c; line-height: 1;
-  }
-  .bundle-name {
-    font-size: 1.4rem; font-weight: 600;
-    margin-top: 0.5rem;
-  }
-  .bundle-label {
-    font-size: 0.75rem; letter-spacing: 0.15em;
-    text-transform: uppercase; color: #c9a84c;
-    margin-bottom: 0.5rem;
-  }
-  .stButton > button {
-    background-color: #0f0f0f !important;
-    color: white !important;
-    border: none !important;
-    padding: 0.75rem 2rem !important;
-    font-size: 1rem !important;
-    font-weight: 600 !important;
-    width: 100% !important;
-    border-radius: 4px !important;
-  }
+  .bundle-card { background: #0f0f0f; color: #f5f2ec; border-radius: 8px; padding: 2rem; text-align: center; margin-top: 1rem; }
+  .bundle-number { font-size: 4rem; font-weight: 900; color: #c9a84c; line-height: 1; }
+  .bundle-name { font-size: 1.4rem; font-weight: 600; margin-top: 0.5rem; }
+  .bundle-label { font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin-bottom: 0.5rem; }
+  .stButton > button { background-color: #0f0f0f !important; color: white !important; border: none !important; padding: 0.75rem 2rem !important; font-size: 1rem !important; font-weight: 600 !important; width: 100% !important; border-radius: 4px !important; }
   .stButton > button:hover { background-color: #3d4a5c !important; }
-  .agent-box {
-    background: #f0ede6;
-    border-left: 4px solid #c9a84c;
-    border-radius: 4px;
-    padding: 1rem 1.2rem;
-    margin-top: 1rem;
-    font-size: 0.95rem;
-    line-height: 1.7;
-  }
+  .agent-box { background: #f0ede6; border-left: 4px solid #c9a84c; border-radius: 4px; padding: 1rem 1.2rem; margin-top: 1rem; font-size: 0.95rem; line-height: 1.7; }
 </style>
 """, unsafe_allow_html=True)
 
 BUNDLE_NAMES = {
-    0: "Auto Comprehensive",    1: "Auto Liability Basic",
-    2: "Basic Health",          3: "Family Comprehensive",
-    4: "Health Dental Vision",  5: "Home Premium",
-    6: "Home Standard",         7: "Premium Health Life",
-    8: "Renter Basic",          9: "Renter Premium",
+    0: "Auto Comprehensive", 1: "Auto Liability Basic", 2: "Basic Health",
+    3: "Family Comprehensive", 4: "Health Dental Vision", 5: "Home Premium",
+    6: "Home Standard", 7: "Premium Health Life", 8: "Renter Basic", 9: "Renter Premium",
 }
 
 BUNDLE_DESCRIPTIONS = {
@@ -81,7 +41,6 @@ BUNDLE_DESCRIPTIONS = {
     9: "Enhanced renters insurance with higher coverage limits and additional protections.",
 }
 
-# ── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_model():
     return load_model()
@@ -89,14 +48,13 @@ def get_model():
 model = get_model()
 
 
-# ── AI Explanation ────────────────────────────────────────────────────────────
 def explain_prediction(bundle_id, bundle_name, profile: dict):
-    """Call Claude to explain why this bundle was recommended."""
-    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    api_key = st.secrets.get("GROQ_API_KEY", "")
     if not api_key:
-        return "⚠️ Set your `ANTHROPIC_API_KEY` in Streamlit secrets to enable AI explanations."
+        return "⚠️ Set your `GROQ_API_KEY` in Streamlit secrets to enable AI explanations."
 
-    client = anthropic.Anthropic(api_key=api_key)
+    from groq import Groq
+    client = Groq(api_key=api_key)
 
     profile_summary = "\n".join([
         f"- Annual Income: ${profile['income']:,.0f}",
@@ -122,20 +80,18 @@ Customer Profile:
 
 In 3-4 sentences, explain to the customer in plain, friendly language WHY this bundle is a good fit for their profile. Be specific — reference their actual profile details. Do not mention the ML model. Sound like a knowledgeable human advisor."""
 
-    message = client.messages.create(
-        model="claude-opus-4-6",
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}]
     )
-    return message.content[0].text
+    return response.choices[0].message.content
 
 
-# ── Header ────────────────────────────────────────────────────────────────────
 st.title("🛡️ InsureIQ — Bundle Recommender")
 st.markdown("Enter a customer profile to get an **AI-powered insurance bundle recommendation**.")
 st.divider()
 
-# ── Form ──────────────────────────────────────────────────────────────────────
 col_form, col_result = st.columns([2, 1], gap="large")
 
 with col_form:
@@ -175,7 +131,6 @@ with col_form:
 
     predict_btn = st.button("Get Recommendation →")
 
-# ── Result ────────────────────────────────────────────────────────────────────
 with col_result:
     st.subheader("Recommendation")
 
@@ -225,7 +180,6 @@ with col_result:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── AI Explanation ─────────────────────────────────────────────────
         st.markdown("**🤖 Why this bundle?**")
         with st.spinner("Generating explanation..."):
             profile = dict(
